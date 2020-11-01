@@ -2,8 +2,14 @@ plaintext = "0123456789ABCDEF"
 key = "133457799BBCDFF1"
 initial_perm = [58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4, 62, 54, 46, 38, 30, 22, 14, 6, 64, 56, 48, 40, 32, 24, 16, 8, 57, 49, 41, 33, 25, 17, 9, 1, 59, 51, 43, 35, 27, 19, 11, 3, 61, 53, 45, 37, 29, 21, 13, 5, 63, 55, 47, 39, 31, 23, 15, 7]
 initial_perm_inverse = [40, 8, 48, 16, 56, 24, 64, 32, 39, 7, 47, 15, 55, 23, 63, 31, 38, 6, 46, 14, 54, 22, 62, 30, 37, 5, 45, 13, 53, 21, 61, 29, 36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27, 34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9, 49, 17, 57, 25]
-PC1_left_perm = [57, 49, 41, 33, 25, 17, 9, 1, 58, 50, 42, 34, 26, 18, 10, 2, 59, 51, 43, 35, 27, 19, 11, 3, 60, 52, 44, 36]
-PC1_right_perm = [63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 22, 14, 6, 61, 53, 45, 37, 29, 21, 13, 5, 28, 20, 12, 4]
+PC1_perm = [57, 49, 41, 33, 25, 17, 9, 
+        1, 58, 50, 42, 34, 26, 18, 
+        10, 2, 59, 51, 43, 35, 27, 
+        19, 11, 3, 60, 52, 44, 36, 
+        63, 55, 47, 39, 31, 23, 15, 
+        7, 62, 54, 46, 38, 30, 22, 
+        14, 6, 61, 53, 45, 37, 29, 
+        21, 13, 5, 28, 20, 12, 4 ] 
 
 PC2_perm = [14, 17, 11, 24, 1, 5, 3, 28, 15, 6, 21, 10, 23, 19, 12, 4, 26, 8, 16, 7, 27, 20, 13, 2, 41, 52, 31, 37, 47, 55, 30, 40, 51, 45, 33, 48, 44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32]
 
@@ -105,13 +111,13 @@ def decimal_to_hex(decimal_array):
             hex_array[i] = 'F'
         elif decimal_array[i] == 14:
             hex_array[i] = 'E'
-        elif decimal_array[i] == 14:
-            hex_array[i] = 'D'
         elif decimal_array[i] == 13:
-            hex_array[i] = 'C'
+            hex_array[i] = 'D'
         elif decimal_array[i] == 12:
-            hex_array[i] = 'B'
+            hex_array[i] = 'C'
         elif decimal_array[i] == 11:
+            hex_array[i] = 'B'
+        elif decimal_array[i] == 10:
             hex_array[i] = 'A'
         else:
             hex_array[i] = str(decimal_array[i])
@@ -162,8 +168,10 @@ def v(i):
         return 2
 
 def PC1(key_array):
-    c = permute_key_array(key_array, PC1_left_perm)
-    d = permute_key_array(key_array, PC1_right_perm)
+    permuted_key = permute_key_array(key_array, PC1_perm)
+
+    c = permuted_key[:28]
+    d = permuted_key[28:]
     return [c, d]
 
 def PC2(C, D):
@@ -177,17 +185,22 @@ def generate_round_keys(key):
     round_keys = [[] for i in range(16)]
 
     c, d = PC1(key)
+    print("C_0 = ", "".join(map(str, c)), "D_0 = ", "".join(map(str, d)))
     for i in range(16):
         c = left_shift(c, v(i + 1))
         d = left_shift(d, v(i + 1))
 
         round_keys[i] = PC2(c, d)
+        
+        print("C_" + str(i + 1) + " =", "".join(map(str, c)), "D_" + str(i + 1) + " =", "".join(map(str, d)))
+        print("K_" + str(i + 1) + " =", "".join(map(str, round_keys[i])))
 
     return round_keys
 
 def hex_key_to_round_keys(hex_key):
-    permuted_key = permute_key_array(flatten_key_matrix(hex_key_to_key_matrix(key)), initial_perm)
-    return generate_round_keys(permuted_key)
+    binary_key = flatten_key_matrix(hex_key_to_key_matrix(key))
+    
+    return generate_round_keys(binary_key)
 
 def expand(RHS):
     return permute_key_array(RHS, expansion_perm)
@@ -213,26 +226,41 @@ def f(RHS, key):
 
 
 def encrypt(plaintext, key):
+    print("GENERATING THE ROUND KEYS:")
+    round_keys = hex_key_to_round_keys(key)
+
     binary_plaintext = []
     for binary_digit in map(hex_to_binary, plaintext):
         binary_plaintext += binary_digit
+    print("Plaintext in binary:", "".join(map(str, binary_plaintext)))
+
     binary_plaintext = permute_key_array(binary_plaintext, initial_perm)
+    print("Plaintext after IP:", "".join(map(str, binary_plaintext)))
 
     LHS = binary_plaintext[:32]
     RHS = binary_plaintext[32:]
-    
-    for round_key in hex_key_to_round_keys(key):
+    print("L_0 = " + "".join(map(str, LHS)), "R_0 = " + "".join(map(str, RHS)))
+
+    for i in range(len(round_keys)):
         old_LHS = list(LHS)
         LHS = list(RHS)
-        partial_RHS = f(RHS, round_key)
-        for i in range(len(RHS)):
-            RHS[i] = (old_LHS[i] + partial_RHS[i]) % 2
-        print(LHS, RHS)
+        partial_RHS = f(RHS, round_keys[i])
+        for j in range(len(RHS)):
+            RHS[j] = (old_LHS[j] + partial_RHS[j]) % 2
+        print("L_" + str(i + 1) + " = " + "".join(map(str, LHS)), "R_" + str(i + 1) + " = " + "".join(map(str, RHS)))
 
-    binary_cipher_text = permute_key_array(LHS + RHS, initial_perm_inverse)
 
-    return binary_cipher_text
+    # Note we do RHS + LHS instead of LHS + RHS because on the last round the left and right sides aren't supposed
+    # to be swapped, but they are swapped in the above loop. RHS + LHS just undoes the swap
+    print("Binary cipher before applying P:", "".join(map(str, RHS + LHS)))
+    binary_cipher_text = permute_key_array(RHS + LHS, initial_perm_inverse)
 
+    print("Final binary cipher text:", "".join(map(str, binary_cipher_text)))
+
+    return "".join(binary_to_hex(binary_cipher_text))
+
+
+
+print("Plaintext:", plaintext, "Key:", key)
 ciphertext = encrypt(plaintext, key)
-print(ciphertext)
-print("".join(binary_to_hex(ciphertext)))
+print("Hex ciphertext:",ciphertext)
